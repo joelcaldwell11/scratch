@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Golf Simulator with Mouse Control and Arc</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+      background-color: #f0f8ff;
+    }
+
+    #gameCanvas {
+      border: 2px solid #000;
+      background-color: #3c9d38; /* Grass green color */
+      display: block;
+      margin: 0 auto;
+    }
+
+    .scoreboard {
+      font-size: 20px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Welcome to the Golf Simulator with Mouse Control and Arc!</h1>
+  <p>Click and hold on the ball, drag to aim, and release to hit!</p>
+  
+  <!-- Scoreboard Section -->
+  <div class="scoreboard" id="scoreboard">
+    Stroke: <span id="strokeCount">0</span>
+  </div>
+
+  <canvas id="gameCanvas" width="800" height="400"></canvas>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Ball properties
+    let ballX = 100;  
+    let ballY = 350;  // Ball is now closer to the ground (canvas height - 50)
+    let ballRadius = 10;
+    let ballSpeedX = 0;
+    let ballSpeedY = 0;
+    let draggingBall = false;
+    let startX, startY;
+    let launchPower = 0;
+    let ballLaunched = false;
+
+    // Stroke Counter
+    let strokeCount = 0;
+    const strokeCountElement = document.getElementById('strokeCount');
+    
+    // Player (Golfer) properties
+    const playerX = 100;
+    const playerY = 200;
+    const playerWidth = 50;
+    const playerHeight = 100;
+
+    // Target (Hole) properties (moved to the bottom)
+    const holeX = 700;
+    const holeY = canvas.height - 50; 
+    const holeRadius = 15;
+
+    // Flagstick properties
+    const flagstickHeight = 40;
+    const flagstickWidth = 5;
+
+    // Pond properties (moved to the bottom)
+    const pondX = 300;
+    const pondY = canvas.height - 50; 
+    const pondWidth = 200;
+    const pondHeight = 50;
+
+    // Gravity and friction constants
+    const gravity = 0.05;
+    const friction = 0.99;
+
+    // Draw the ball
+    function drawBall() {
+      ctx.beginPath();
+      ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
+      ctx.fillStyle = "#ff6347";  // Red color for the ball
+      ctx.fill();
+      ctx.closePath();
+    }
+
+    // Draw the hole and flagstick
+    function drawHole() {
+      ctx.beginPath();
+      ctx.arc(holeX, holeY, holeRadius, 0, Math.PI * 2);
+      ctx.fillStyle = "#000";  
+      ctx.fill();
+      ctx.closePath();
+      
+      ctx.beginPath();
+      ctx.moveTo(holeX, holeY - holeRadius);
+      ctx.lineTo(holeX, holeY - holeRadius - flagstickHeight);
+      ctx.lineWidth = flagstickWidth;
+      ctx.strokeStyle = "#ff0000";  
+      ctx.stroke();
+      ctx.closePath();
+    }
+
+    // Draw the pond
+    function drawPond() {
+      ctx.beginPath();
+      ctx.ellipse(pondX + pondWidth / 2, pondY, pondWidth / 2, pondHeight, 0, 0, Math.PI * 2);
+      ctx.fillStyle = "#0077be";  
+      ctx.fill();
+      ctx.closePath();
+    }
+
+    // Update the ball's position
+    function updateBallPosition() {
+      if (ballLaunched) {
+        ballSpeedY += gravity;  
+
+        ballX += ballSpeedX;
+        ballY += ballSpeedY;
+
+        ballSpeedX *= friction;
+        ballSpeedY *= friction;
+
+        if (ballX < ballRadius || ballX > canvas.width - ballRadius) {
+          ballSpeedX = -ballSpeedX;
+        }
+
+        if (ballY < ballRadius) {
+          ballSpeedY = -ballSpeedY;
+        }
+
+        if (ballY > canvas.height - ballRadius) {
+          ballY = canvas.height - ballRadius;
+          ballSpeedY = 0;
+        }
+
+        // Check if the ball reaches the hole (target)
+        const distanceToHole = Math.sqrt(Math.pow(ballX - holeX, 2) + Math.pow(ballY - holeY, 2));
+        if (distanceToHole < ballRadius + holeRadius) {
+          displayPopupMessage(); // Show message based on strokes
+          resetGame();  // Reset game after ball goes in the hole
+        }
+
+        // Check if the ball lands in the pond
+        const distanceToPond = Math.sqrt(Math.pow(ballX - (pondX + pondWidth / 2), 2) + Math.pow(ballY - pondY, 2));
+        if (distanceToPond < ballRadius + pondHeight) {
+          alert("Oh no! The ball landed in the pond!");
+          resetGame();  // Reset game if ball lands in pond
+        }
+      }
+    }
+
+    // Reset game to initial state and stroke count reset
+    function resetGame() {
+      ballX = 100;
+      ballY = 350;  // Reset ball to the lower starting position
+      ballSpeedX = 0;
+      ballSpeedY = 0;
+      ballLaunched = false;
+
+      strokeCount = 0;  // Reset stroke count
+      strokeCountElement.textContent = strokeCount;  // Update stroke count on the screen
+    }
+
+    // Display message based on the number of strokes (popup)
+    function displayPopupMessage() {
+      let message = "";
+      if (strokeCount === 1) {
+        message = "Hole-in-one!";
+      } else if (strokeCount === 2) {
+        message = "Birdie!";
+      } else if (strokeCount === 3) {
+        message = "Par!";
+      } else {
+        message = "Nice try! Keep practicing!";
+      }
+
+      alert(message);  // Display the message in a popup
+    }
+
+    // Draw the launch trajectory (arc)
+    function drawLaunchArc() {
+      const dx = mouseX - ballX;
+      const dy = mouseY - ballY;
+
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const maxDistance = 50; // Max launch distance
+
+      const launchPower = Math.min(distance / 5, maxDistance);
+      const angle = Math.atan2(dy, dx);
+
+      const steps = 50;
+      const stepTime = 0.1;
+      
+      ctx.beginPath();
+      ctx.moveTo(ballX, ballY);
+
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        const power = launchPower * t;
+
+        const velocityX = Math.cos(angle) * power;
+        const velocityY = Math.sin(angle) * power - gravity * t;
+
+        const x = ballX + velocityX * stepTime * i;
+        const y = ballY + velocityY * stepTime * i;
+
+        if (y > canvas.height) break; // Don't draw if the trajectory falls below the canvas
+
+        ctx.lineTo(x, y);
+      }
+
+      ctx.strokeStyle = "#ff6347";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.closePath();
+    }
+
+    // Handle mouse events to drag the ball
+    let mouseX, mouseY;
+
+    canvas.addEventListener('mousedown', (e) => {
+      const mousePosX = e.offsetX;
+      const mousePosY = e.offsetY;
+
+      // Check if the user clicked on the ball
+      const distance = Math.sqrt(Math.pow(mousePosX - ballX, 2) + Math.pow(mousePosY - ballY, 2));
+      if (distance <= ballRadius) {
+        draggingBall = true;
+        startX = mousePosX;
+        startY = mousePosY;
+      }
+    });
+
+    // Handle mouse movement to drag the ball and draw the arc
+    canvas.addEventListener('mousemove', (e) => {
+      if (draggingBall) {
+        mouseX = e.offsetX;
+        mouseY = e.offsetY;
+
+        // Update the arc when the mouse moves
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawPond();  
+        drawHole();  
+        drawBall();  
+
+        // Draw the launch arc showing where the ball will go
+        drawLaunchArc();
+      }
+    });
+
+    // Handle mouse release to launch the ball and increase stroke count
+    canvas.addEventListener('mouseup', (e) => {
+      if (draggingBall) {
+        const dx = mouseX - ballX;
+        const dy = mouseY - ballY;
+
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        launchPower = Math.min(distance / 5, 50);
+        const angle = Math.atan2(dy, dx);
+
+        // Calculate speed for the launch
+        ballSpeedX = Math.cos(angle) * launchPower;
+        ballSpeedY = Math.sin(angle) * launchPower;
+
+        ballLaunched = true;
+        draggingBall = false;
+
+        // Increase stroke count when mouse is released
+        strokeCount++;
+        strokeCountElement.textContent = strokeCount;  // Update stroke count on the screen
+      }
+    });
+
+    // Main game loop
+    function gameLoop() {
+      if (!draggingBall) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);  // Clear canvas
+        drawPond();  
+        drawHole();  
+        updateBallPosition();  // Update ball position
+        drawBall();  
+      }
+
+      requestAnimationFrame(gameLoop);  // Repeat the game loop
+    }
+
+    // Start the game loop
+    gameLoop();
+
+  </script>
+
+</body>
+</html>
